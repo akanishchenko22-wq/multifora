@@ -36,6 +36,12 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Claude Code workspace
+.claude/
+
+# Личные бэкапы (не в репо)
+pages/*копия*.js
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
