@@ -39,6 +39,8 @@ export default async function handler(req, res) {
   const name     = fullName.trim();
   const basePath = `disk:/Мультифора/${name}`;
 
+  // № 6 (английский) и № 9 (семья) — только txt-файлы в корне папки пользователя,
+  // отдельные папки под них не создаём.
   const folders = [
     'disk:/Мультифора',
     basePath,
@@ -47,10 +49,8 @@ export default async function handler(req, res) {
     `${basePath}/3. ИНН`,
     `${basePath}/4. Трудовая книжка`,
     `${basePath}/5. Образование`,
-    `${basePath}/6. Уровень английского`,
     `${basePath}/7. Водительские права`,
     `${basePath}/8. Военный билет`,
-    `${basePath}/9. О семье`,
   ];
 
   try {
