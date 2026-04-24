@@ -1216,10 +1216,18 @@ export default function Home() {
 
       {/*
         Обёртка-колонка на весь вьюпорт.
-        Экраны 2 и 3: Task + DocList (прокрутка страницы) + BottomMenu (fixed).
-        Экран 1: Task + центрированная карточка с кнопкой.
+        Экран 1: ровно 100dvh, overflow:hidden — никакого скролла, всё помещается.
+        Экраны 2/3: minHeight: 100vh — страница скроллится (там длинный DocList).
+        100dvh — «dynamic viewport height», учитывает адресную строку браузера
+        на мобилке (в отличие от 100vh, который включает скрытый chrome).
       */}
-      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: step === 1 ? '100dvh' : '100vh',
+        height:    step === 1 ? '100dvh' : 'auto',
+        overflow:  step === 1 ? 'hidden'  : 'visible',
+      }}>
 
         {/* ── Task (header) ── */}
         <Task step={step} onBack={step > 1 ? handleBack : null} titleRef={titleRef} />
@@ -1227,21 +1235,22 @@ export default function Home() {
         {/* ─────────────── ЭКРАН 1 ─────────────── */}
         {step === 1 && (
           /*
-            Группа «карточка + кнопка» ровно по центру экрана — и на смартфоне, и на Desktop.
-            position: fixed + top/left 50% + translate(-50%,-50%) даёт точный геометрический центр
-            вьюпорта независимо от высоты Task сверху.
+            Flex-центрирование в оставшемся пространстве под Task.
+            Никаких position:fixed — карточка в обычном потоке, флекс центрирует.
+            При открытии клавиатуры iOS ужимает dvh — центровка автоматически
+            перестраивается в меньшем видимом окне.
           */
           <div style={{
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             width: '100%',
-            maxWidth: 402,
             padding: '0 8px',
             boxSizing: 'border-box',
-            zIndex: 1,
+            minHeight: 0, // разрешаем flex-потомку ужиматься под маленький экран
           }}>
+           <div style={{ width: '100%', maxWidth: 402 }}>
             {/* Карточка ФИО */}
             <DocCard id="doc-name" title="Назовите ФИО">
               <TextField
@@ -1279,6 +1288,7 @@ export default function Home() {
             >
               Начать
             </button>
+           </div>
           </div>
         )}
 
