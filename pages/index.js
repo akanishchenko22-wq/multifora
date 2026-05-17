@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect, useCallback, forwardRef } from 'react';
 import Head from 'next/head';
+import GyroShine from '@/lib/sensors';
 
 // =============================================
 // УТИЛИТЫ
 // =============================================
 
-const digitsOnly   = v => v.replace(/\D/g, '');
+const digitsOnly    = v => v.replace(/\D/g, '');
 const normalizeName = v => v.trim().replace(/\s+/g, ' ');
+const UPLOAD_BATCH_SIZE = 10;
 
 // Маппинг QWERTY → ЙЦУКЕН (позиционный, по раскладке клавиатуры)
 const qwertyToRu = (() => {
@@ -30,7 +32,6 @@ const qwertyToRu = (() => {
 })();
 const toRussianName = v =>
   v.split('').map(c => qwertyToRu[c] ?? c).join('').replace(/[^а-яА-ЯёЁ\s-]/g, '');
-const toDigitsOnly = v => v.replace(/\D/g, '');
 
 // =============================================
 // ИКОНКИ — существующие
@@ -42,9 +43,9 @@ const IconCheckDone = () => (
   </svg>
 );
 
-const IconCheckEmpty = () => (
+const IconCheckEmpty = ({ color = 'var(--icon-neutral)' }) => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-    <path d="M12 3C16.9706 3 21 7.02944 21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3ZM10.9326 13.5176L8.70703 11.293L7.29297 12.707L11.0674 16.4814L11.7686 15.6406L16.7686 9.64062L15.2314 8.35938L10.9326 13.5176Z" style={{ fill: 'var(--icon-neutral)' }}/>
+    <path d="M12 3C16.9706 3 21 7.02944 21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3ZM10.9326 13.5176L8.70703 11.293L7.29297 12.707L11.0674 16.4814L11.7686 15.6406L16.7686 9.64062L15.2314 8.35938L10.9326 13.5176Z" style={{ fill: color }}/>
   </svg>
 );
 
@@ -140,7 +141,6 @@ const cssVars = `
     --sheet-bg:           rgba(255,255,255,0.05);
     --panel-bg:           rgba(255,255,255,0.65);
     --border-light:       #E6E6EB;
-    --panel-border:       #E6E6EB;
     --text-primary:       #33363F;
     --text-secondary:     rgba(51,54,63,0.65);
     --text-disabled:      rgba(51,54,63,0.25);
@@ -159,27 +159,17 @@ const cssVars = `
     --field-clear-circle: #33363F;
     --field-clear-cross:  #FFFFFF;
     --checkbox-bg:        rgba(51,54,63,0.05);
-    --linear-primary:     #FFFFFF;
-    --linear-secondary:   rgba(230,230,235,0.20);
     --tooltip-bg:         #33363F;
     --tooltip-text:       #FFFFFF;
     --gb-border:          rgba(51,54,63,0.05);
     --gb-glint:           255,255,255;
-
-    /* ── Figma variable collection (light) ───────────────────────── */
-    --basic-page_bg_primary:   var(--card-bg);
-    --basic-page_bg_secondary: var(--field-bg);
-    --basic-page_bg_tertiary:  var(--panel-bg);
-    --basic-sheet_bg_blur:     var(--sheet-bg);
-    --text-control_white:      #FFFFFF;
-    --text-control_gray:       #33363F;
-    --text-control_blue:       #446BF2;
-    --controls-primary_bg:     var(--primary);
-    --controls-attachment_bg:  var(--primary-bg);
-    --controls-segment_bg:     var(--segment-bg);
-    --success-border:          var(--border-good);
-    --linear-primary-token:    var(--linear-primary);
-    --linear-secondary-token:  var(--linear-secondary);
+    --gyro-gamma-percent: 50;
+    --gyro-beta-percent:  50;
+    --ui-bounce-fast:     180ms;
+    --ui-bounce-medium:   320ms;
+    --ui-bounce-ease:     cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ui-bounce-ease-soft:cubic-bezier(0.22, 1.15, 0.36, 1);
+    --ui-tap-scale:       0.985;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -190,7 +180,6 @@ const cssVars = `
       --sheet-bg:           rgba(19,19,21,0.05);
       --panel-bg:           rgba(19,19,21,0.80);
       --border-light:       rgba(230,230,235,0.30);
-      --panel-border:       rgba(230,230,235,0.30);
       --text-primary:       #FFFFFF;
       --text-secondary:     rgba(230,230,235,0.65);
       --text-disabled:      rgba(230,230,235,0.30);
@@ -209,12 +198,17 @@ const cssVars = `
       --checkbox-bg:        rgba(230,230,235,0.05);
       --error-border:       rgba(255,56,60,0.25);
       --error-text:         #FF383C;
-      --linear-primary:     rgba(230,230,235,0.50);
-      --linear-secondary:   rgba(230,230,235,0.04);
       --tooltip-bg:         #E6E6EB;
       --tooltip-text:       #33363F;
       --gb-border:          rgba(230,230,235,0.05);
       --gb-glint:           112,112,112;
+      --gyro-gamma-percent: 50;
+      --gyro-beta-percent:  50;
+      --ui-bounce-fast:     180ms;
+      --ui-bounce-medium:   320ms;
+      --ui-bounce-ease:     cubic-bezier(0.34, 1.56, 0.64, 1);
+      --ui-bounce-ease-soft:cubic-bezier(0.22, 1.15, 0.36, 1);
+      --ui-tap-scale:       0.985;
     }
   }
   * { box-sizing: border-box; }
@@ -223,38 +217,83 @@ const cssVars = `
   input::placeholder { color: var(--text-disabled); font-family: SF Pro Text, -apple-system, sans-serif; font-size: 17px; letter-spacing: -0.408px; }
   input { caret-color: #446BF2; }
   ::-webkit-scrollbar { display: none; }
-  @property --gyro-angle {
-    syntax: '<angle>';
-    inherits: true;
-    initial-value: 225deg;
+  button, .tap-bounce {
+    -webkit-tap-highlight-color: transparent;
+    transform: translateZ(0);
   }
-
-  .gb { position: relative; border: none !important; }
+  @media (prefers-reduced-motion: no-preference) {
+    button:not(:disabled), .tap-bounce {
+      transition: transform var(--ui-bounce-fast) var(--ui-bounce-ease-soft);
+      will-change: transform;
+    }
+    button:not(:disabled):active, .tap-bounce:active {
+      transform: scale(var(--ui-tap-scale)) translateY(1px);
+    }
+  }
+  .gb {
+    position: relative;
+    border: none !important;
+    --g-offset: 0;
+    --b-offset: 0;
+    /* --- tuning: shape внутри контура поля --- */
+    --spot-speed-x: -1.75%;
+    --spot-speed-y: -0.95%;
+    --spot-base-y: 50%;
+    --spot-core-color: rgba(250,250,250,0.94);
+    --spot-color: rgba(var(--gb-glint), 0.66);
+    --spot-color-mid: rgba(var(--gb-glint), 0.34);
+    box-shadow: none;
+  }
   .gb::after {
     content: '';
     position: absolute;
     inset: 0;
     border-radius: inherit;
     padding: 1px;
-    /* Маска: content-box XOR padding-box = видна только кромка.
-       Блик заперт в контуре — не протечёт ни внутрь, ни наружу. */
     -webkit-mask:
       linear-gradient(#fff 0 0) content-box,
       linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
-    /* Каждый элемент вычисляет позиции пятен из общего угла --gyro-angle.
-       cos()/sin() в CSS дают позиции относительно СОБСТВЕННОГО размера элемента.
-       30px — фиксированный радиус пятна (одинаковый на chip и textfield). */
-    --_a: calc(var(--gyro-angle) + var(--gb-offset, 0deg));
     background:
-      radial-gradient(var(--gb-radius, 20px) at calc(50% + 50% * cos(var(--_a))) calc(50% + 50% * sin(var(--_a))),
-        rgba(var(--gb-glint), var(--op1, 0.4)) 0%, transparent 100%),
-      radial-gradient(var(--gb-radius, 20px) at calc(50% - 50% * cos(var(--_a))) calc(50% - 50% * sin(var(--_a))),
-        rgba(var(--gb-glint), var(--op2, 0.4)) 0%, transparent 100%),
+      radial-gradient(
+        ellipse 120% 100% at 50% var(--spot-base-y),
+        var(--spot-core-color) 0%,
+        var(--spot-color) 22%,
+        var(--spot-color-mid) 66%,
+        transparent 92%
+      ),
       var(--gb-border);
     pointer-events: none;
+    will-change: background;
     z-index: 10;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .gb {
+      --g-offset: calc(var(--gyro-gamma-percent) - 50);
+      --b-offset: calc(var(--gyro-beta-percent) - 50);
+    }
+    .gb::after {
+      background:
+        radial-gradient(
+          ellipse 120% 100% at
+            calc(50% + var(--g-offset) * var(--spot-speed-x))
+            calc(var(--spot-base-y) + var(--b-offset) * var(--spot-speed-y)),
+          var(--spot-core-color) 0%,
+          var(--spot-color) 22%,
+          var(--spot-color-mid) 66%,
+          transparent 92%
+        ),
+        var(--gb-border);
+    }
+  }
+  .sticky-nav-fade {
+    background: linear-gradient(
+      180deg,
+      var(--page-bg) 0%,
+      var(--page-bg) calc(100% - 28px),
+      transparent 100%
+    ) !important;
   }
 `;
 
@@ -262,88 +301,40 @@ const cssVars = `
 // ХУКИ
 // =============================================
 
-function useGyroscope() {
+function useGyroShine() {
   useEffect(() => {
-    let raf;
-    let targetGamma = 0, targetBeta = 0;
-    let currGamma = 0, currBeta = 0;
-    const LERP = 0.08;
+    const root = document.documentElement.style;
+    root.setProperty('--gyro-gamma-percent', '50');
+    root.setProperty('--gyro-beta-percent', '50');
 
-    const tick = () => {
-      currGamma += (targetGamma - currGamma) * LERP;
-      currBeta  += (targetBeta  - currBeta)  * LERP;
-
-      // 225° база → покой = top-left + bottom-right
-      const angleDeg = currGamma + 225;
-      const angleRad = (angleDeg * Math.PI) / 180;
-
-      // Beta модулирует яркость: наклон "от себя" → верхнее пятно чуть ярче.
-      // Мягкая модуляция: база 0.5, ±0.25 при полном наклоне (60°).
-      // Оба пятна всегда видны даже при лёгком тильте.
-      const sinA = Math.sin(angleRad);
-      const bFactor = Math.max(-1, Math.min(1, currBeta / 60));
-      const spot1Top = sinA < 0;
-      const op1 = Math.max(0.2, Math.min(1, spot1Top ? 0.5 + bFactor * 0.25 : 0.5 - bFactor * 0.25));
-      const op2 = Math.max(0.2, Math.min(1, spot1Top ? 0.5 - bFactor * 0.25 : 0.5 + bFactor * 0.25));
-
-      // Только 3 переменных — позиции вычисляются каждым элементом в CSS
-      const root = document.documentElement.style;
-      root.setProperty('--gyro-angle', `${angleDeg.toFixed(2)}deg`);
-      root.setProperty('--op1', op1.toFixed(3));
-      root.setProperty('--op2', op2.toFixed(3));
-
-      raf = requestAnimationFrame(tick);
+    const gyro = new GyroShine({ refreshRate: 42, useMouse: true });
+    const handleChange = e => {
+      root.setProperty('--gyro-gamma-percent', e.detail.gammaPercent);
+      root.setProperty('--gyro-beta-percent', e.detail.betaPercent);
     };
-    raf = requestAnimationFrame(tick);
+    gyro.on('change', handleChange);
 
-    const onOrientation = e => {
-      targetGamma = e.gamma ?? 0;
-      targetBeta  = e.beta  ?? 0;
-    };
-    const onMouse = e => {
-      targetGamma = (e.clientX / window.innerWidth  - 0.5) * 180;
-      targetBeta  = (e.clientY / window.innerHeight - 0.5) * 90;
+    let stopped = false;
+    let starting = false;
+    const startGyro = () => {
+      if (stopped || starting) return;
+      starting = true;
+      Promise.resolve(gyro.start()).finally(() => { starting = false; });
     };
 
-    window.addEventListener('mousemove', onMouse);
-
-    if (typeof DeviceOrientationEvent === 'undefined') {
-      return () => {
-        cancelAnimationFrame(raf);
-        window.removeEventListener('mousemove', onMouse);
-      };
-    }
-
-    let ask = null;
-
-    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-      // iOS 13+ — нужен явный жест пользователя
-      ask = () => {
-        DeviceOrientationEvent.requestPermission()
-          .then(state => {
-            if (state === 'granted') {
-              window.addEventListener('deviceorientation', onOrientation);
-            }
-          })
-          .catch(() => {});
-        document.removeEventListener('touchend', ask);
-        document.removeEventListener('click',    ask);
-      };
-      document.addEventListener('touchend', ask, { once: true });
-      document.addEventListener('click',    ask, { once: true });
-    } else {
-      // Android / desktop DeviceOrientation
-      window.addEventListener('deviceorientation', onOrientation);
-    }
+    // Пытаемся стартовать сразу; на iOS повторяем из пользовательского жеста.
+    startGyro();
+    document.addEventListener('click', startGyro, { passive: true });
+    document.addEventListener('touchend', startGyro, { passive: true });
 
     return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener('mousemove', onMouse);
-      window.removeEventListener('deviceorientation', onOrientation);
-      if (ask) {
-        document.removeEventListener('touchend', ask);
-        document.removeEventListener('click',    ask);
-      }
+      stopped = true;
+      document.removeEventListener('click', startGyro);
+      document.removeEventListener('touchend', startGyro);
+      gyro.off('change', handleChange);
+      gyro.stop();
+      root.setProperty('--gyro-gamma-percent', '50');
+      root.setProperty('--gyro-beta-percent', '50');
     };
   }, []);
 }
@@ -423,7 +414,7 @@ function TextField({ label, placeholder, value, onChange, onCommit, error, digit
       )}
       <div
         className={error ? undefined : 'gb'}
-        style={{ '--gb-offset': '-24deg', '--gb-radius': '32px', display: 'flex', height: 44, paddingLeft: 16, alignItems: 'flex-start', alignSelf: 'stretch', borderRadius: 16, border: 'none', outline: error ? '0.5px solid var(--error-border)' : 'none', outlineOffset: '-0.5px', background: 'var(--field-bg)', overflow: 'hidden' }}
+        style={{ '--gb-offset': '-24deg', display: 'flex', height: 44, paddingLeft: 16, alignItems: 'flex-start', alignSelf: 'stretch', borderRadius: 16, border: 'none', outline: error ? '0.5px solid var(--error-border)' : 'none', outlineOffset: '-0.5px', background: 'var(--field-bg)', overflow: 'hidden' }}
       >
         <div style={{ flex: '1 0 0', alignSelf: 'stretch', display: 'flex', alignItems: 'flex-start', padding: '11px 16px 11px 0', minWidth: 0 }}>
           <input
@@ -557,7 +548,7 @@ function FileUpload({ hint, value, onChange, compact = false, buttonLabel = 'З�
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 12, alignSelf: 'stretch' }}>
       {hint && <div style={{ alignSelf: 'stretch', color: 'var(--text-secondary)', fontFamily: 'Onest', fontSize: 16, fontWeight: 400, lineHeight: '140%' }}>{hint}</div>}
       {value.length === 0 ? (
-        <label style={{ ...uploadBtnStyle(compact ? 'auto' : '100%', compact ? 44 : 89), alignSelf: compact ? 'flex-start' : 'stretch', padding: '0 16px', gap: 8, minHeight: compact ? 44 : 56 }}>
+        <label className="tap-bounce" style={{ ...uploadBtnStyle(compact ? 'auto' : '100%', compact ? 44 : 89), alignSelf: compact ? 'flex-start' : 'stretch', padding: '0 16px', gap: 8, minHeight: compact ? 44 : 56 }}>
           <IconUpload />
           <span style={{ color: '#446BF2', fontFamily: 'Onest', fontSize: 16, fontWeight: 500, lineHeight: '16px', whiteSpace: 'nowrap' }}>{buttonLabel}</span>
           <input type="file" multiple accept=".png,.jpg,.jpeg,.pdf" onChange={handleChange} style={{ display: 'none' }} />
@@ -565,7 +556,7 @@ function FileUpload({ hint, value, onChange, compact = false, buttonLabel = 'З�
       ) : (
         <div style={{ display: 'flex', alignItems: 'stretch', gap: 8, alignSelf: 'stretch', height: 150 }}>
           {canAddMore && (
-            <label style={uploadBtnStyle(87, '100%')}>
+            <label className="tap-bounce" style={uploadBtnStyle(87, '100%')}>
               <IconUpload />
               <input type="file" multiple accept=".png,.jpg,.jpeg,.pdf" onChange={handleChange} style={{ display: 'none' }} />
             </label>
@@ -591,7 +582,7 @@ function SegmentPicker({ options, value, onChange }) {
         return (
           <div key={opt} style={{ display: 'flex', flex: '1 0 0', alignItems: 'center', height: 40 }}>
             {showSep && <div style={{ width: '0.5px', height: 16, flexShrink: 0, background: 'var(--divider)' }} />}
-            <button onClick={() => onChange(opt)} style={{ flex: '1 0 0', height: 40, padding: '0 10px', display: 'flex', justifyContent: 'center', alignItems: 'center', borderRadius: 16, border: 'none', outline: selected ? '0.5px solid var(--field-bg)' : 'none', outlineOffset: '-0.5px', background: selected ? 'var(--segment-bg)' : 'transparent', boxShadow: selected ? '0px 3px 8px 0px rgba(0,0,0,0.12), 0px 3px 1px 0px rgba(0,0,0,0.04)' : 'none', cursor: 'pointer', overflow: 'hidden', transition: 'all 0.15s' }}>
+            <button onClick={() => onChange(opt)} style={{ flex: '1 0 0', height: 40, padding: '0 10px', display: 'flex', justifyContent: 'center', alignItems: 'center', borderRadius: 16, border: 'none', outline: selected ? '0.5px solid var(--field-bg)' : 'none', outlineOffset: '-0.5px', background: selected ? 'var(--segment-bg)' : 'transparent', boxShadow: selected ? '0px 3px 8px 0px rgba(0,0,0,0.12), 0px 3px 1px 0px rgba(0,0,0,0.04)' : 'none', cursor: 'pointer', overflow: 'hidden', transition: 'transform var(--ui-bounce-fast) var(--ui-bounce-ease), box-shadow 180ms var(--ui-bounce-ease-soft), background 180ms var(--ui-bounce-ease-soft), color 180ms var(--ui-bounce-ease-soft)' }}>
               <div style={{ display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 1, flex: '1 0 0', overflow: 'hidden', textAlign: 'center', textOverflow: 'ellipsis', color: selected ? 'var(--ctrl-gray)' : 'var(--text-primary)', fontFamily: 'Onest', fontSize: 16, fontWeight: selected ? 600 : 500, lineHeight: '100%', whiteSpace: 'nowrap' }}>
                 {opt}
               </div>
@@ -630,17 +621,57 @@ function DocCard({ id, title, subtitle, children }) {
   );
 }
 
-function CheckChip({ label, done, anchorId }) {
+function CheckChip({ label, done, error, anchorId }) {
   const scrollTo = () => {
     const el = document.getElementById(anchorId);
     if (!el) return;
     const top = el.getBoundingClientRect().top + window.scrollY - 104;
     window.scrollTo({ top, behavior: 'smooth' });
   };
+  const baseStyle = {
+    display: 'inline-flex',
+    height: 32,
+    padding: '0 10px 0 4px',
+    alignItems: 'center',
+    gap: 2,
+    borderRadius: 16,
+    border: 'none',
+    outlineOffset: '-0.5px',
+    background: 'var(--card-bg)',
+    backdropFilter: 'blur(2px)',
+    cursor: 'pointer',
+    flexShrink: 0,
+  };
+  const labelStyle = {
+    fontFamily: 'Onest',
+    fontSize: 16,
+    fontWeight: 400,
+    lineHeight: '140%',
+    whiteSpace: 'nowrap',
+  };
+
+  if (done) {
+    return (
+      <button onClick={scrollTo} className="tap-bounce" style={{ ...baseStyle, outline: '0.5px solid var(--border-good)' }}>
+        <IconCheckDone />
+        <div style={{ ...labelStyle, color: 'var(--text-secondary)' }}>{label}</div>
+      </button>
+    );
+  }
+
+  if (error) {
+    return (
+      <button onClick={scrollTo} className="gb tap-bounce" style={{ ...baseStyle, outline: '0.5px solid var(--error-border)' }}>
+        <IconCheckEmpty color="var(--error-text)" />
+        <div style={{ ...labelStyle, color: 'var(--error-text)' }}>{label}</div>
+      </button>
+    );
+  }
+
   return (
-    <button onClick={scrollTo} className={done ? undefined : 'gb'} style={{ display: 'inline-flex', height: 32, padding: '0 10px 0 4px', alignItems: 'center', gap: 2, borderRadius: 16, border: 'none', outline: done ? '0.5px solid var(--border-good)' : 'none', outlineOffset: '-0.5px', background: 'var(--card-bg)', backdropFilter: 'blur(2px)', cursor: 'pointer', flexShrink: 0 }}>
-      {done ? <IconCheckDone /> : <IconCheckEmpty />}
-      <div style={{ color: 'var(--text-secondary)', fontFamily: 'Onest', fontSize: 16, fontWeight: 400, lineHeight: '140%', whiteSpace: 'nowrap' }}>{label}</div>
+    <button onClick={scrollTo} className="gb tap-bounce" style={{ ...baseStyle, outline: 'none' }}>
+      <IconCheckEmpty />
+      <div style={{ ...labelStyle, color: 'var(--text-secondary)' }}>{label}</div>
     </button>
   );
 }
@@ -670,7 +701,9 @@ function Task({ step, onBack, titleRef }) {
   return (
     <>
       {/* Nav — sticky на экранах 2/3, остаётся при скролле */}
-      <div style={{
+      <div
+        className={isScrollable ? 'sticky-nav-fade' : undefined}
+        style={{
         position: isScrollable ? 'sticky' : 'relative',
         top: 0,
         zIndex: 50,
@@ -679,10 +712,10 @@ function Task({ step, onBack, titleRef }) {
         margin: '0 auto',
         paddingTop: 'calc(20px + env(safe-area-inset-top, 0px))',
         paddingRight: 8,
-        paddingBottom: 8,
+        paddingBottom: isScrollable ? 28 : 8,
         paddingLeft: 8,
         boxSizing: 'border-box',
-        background: isScrollable ? 'var(--page-bg)' : 'transparent',
+        background: isScrollable ? undefined : 'transparent',
       }}>
         <div style={{
           position: 'relative',
@@ -724,8 +757,8 @@ function Task({ step, onBack, titleRef }) {
       */}
       <div ref={titleRef} style={{
         position: isScrollable ? 'sticky' : 'relative',
-        // nav: 20 (safe-area-top) + 32 (иконки) + 8 (padding-bottom) = 60
-        top: isScrollable ? 'calc(60px + env(safe-area-inset-top, 0px))' : 'auto',
+        // nav: 20 (safe-area-top) + 32 (иконки) + 28 (padding-bottom с градиентом) = 80
+        top: isScrollable ? 'calc(80px + env(safe-area-inset-top, 0px))' : 'auto',
         zIndex: 10,
         width: '100%',
         maxWidth: 402,
@@ -783,9 +816,10 @@ function DocList({ children, bottomPad }) {
 
 // BottomMenu — фиксированная панель внизу с чипами и кнопкой
 const BottomMenu = forwardRef(function BottomMenu(
-  { chips, buttonLabel, onButton, buttonDisabled, errorText },
+  { chips, buttonLabel, onButton, buttonDisabled, buttonLoading, errorText },
   ref
 ) {
+  const btnInactive = buttonDisabled && !buttonLoading;
   return (
     <div
       ref={ref}
@@ -819,8 +853,8 @@ const BottomMenu = forwardRef(function BottomMenu(
         {/* Чипы */}
         <div style={{ padding: '12px 8px 0 8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 4 }}>
-            {chips.map(({ label, done, anchorId }) => (
-              <CheckChip key={label} label={label} done={done} anchorId={anchorId} />
+            {chips.map(({ label, done, error, anchorId }) => (
+              <CheckChip key={label} label={label} done={done} error={error} anchorId={anchorId} />
             ))}
           </div>
         </div>
@@ -835,25 +869,25 @@ const BottomMenu = forwardRef(function BottomMenu(
         {/* Кнопка */}
         <div style={{ padding: 8 }}>
           <button
-            disabled={buttonDisabled}
+            disabled={buttonDisabled || buttonLoading}
             onClick={onButton}
             style={{
               display: 'flex',
               width: '100%',
               height: 56,
-              padding: '0 16px',
+              padding: '0 12px',
               justifyContent: 'center',
               alignItems: 'center',
               borderRadius: 16,
               border: 'none',
-              background: buttonDisabled ? 'var(--ctrl-disabled)' : '#446BF2',
-              color: buttonDisabled ? 'var(--text-disabled)' : '#FFFFFF',
+              background: btnInactive ? 'var(--ctrl-disabled)' : '#446BF2',
+              color: btnInactive ? 'var(--text-disabled)' : '#FFFFFF',
               fontFamily: 'Onest',
-              fontSize: 16,
+              fontSize: buttonLoading ? 15 : 16,
               fontWeight: 500,
               lineHeight: '16px',
-              cursor: buttonDisabled ? 'default' : 'pointer',
-              transition: 'all 0.2s',
+              cursor: (buttonDisabled || buttonLoading) ? 'default' : 'pointer',
+              transition: 'transform var(--ui-bounce-fast) var(--ui-bounce-ease), background 180ms var(--ui-bounce-ease-soft), color 180ms var(--ui-bounce-ease-soft)',
             }}
           >
             {buttonLabel}
@@ -869,7 +903,7 @@ const BottomMenu = forwardRef(function BottomMenu(
 // =============================================
 
 export default function Home() {
-  useGyroscope();
+  useGyroShine();
 
   // ── Шаг ────────────────────────────────────────────────────────────────────
   const [step, setStep] = useState(1);
@@ -883,13 +917,16 @@ export default function Home() {
   // ── Статус отправки ─────────────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess]       = useState(false);
-  const [serverError, setServerError]   = useState(null);
+  const [serverError, setServerError]       = useState(null);
+  const [submitPhase, setSubmitPhase]       = useState(null);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
-  // ── Фоновые операции (создаём один раз, не пересоздаём при навигации) ──────
-  // foldersPromise: Promise<{basePath}>, запускается при переходе 1→2, ждёт создания папок
-  const foldersPromiseRef    = useRef(null);
-  // step2UploadPromise: Promise<void>, запускается при переходе 2→3, ждёт загрузки файлов
+  // ── Фоновые операции ───────────────────────────────────────────────────────
+  // foldersPromise: Promise<{basePath}>, привязан к normalizeName(ФИО)
+  const foldersPromiseRef     = useRef(null);
+  const foldersNameRef        = useRef(null);
   const step2UploadPromiseRef = useRef(null);
+  const step2UploadGenRef     = useRef(0);
 
   // ── Высота BottomMenu для точных 8px отступа ───────────────────────────────
   const menuRef             = useRef(null);
@@ -908,6 +945,22 @@ export default function Home() {
     }
   }, [step]);
 
+  const getStep2Snap = useCallback(() => ({
+    snils: committed.snils,
+    inn: committed.inn,
+    educationPlace: committed.educationPlace,
+    contractNumber: committed.contractNumber,
+    accountNumber: committed.accountNumber,
+    bik: committed.bik,
+    corrAccount: committed.corrAccount,
+    noEducation: toggles.noEducation,
+    passport: [...files.passport],
+    snilsFiles: [...files.snilsFiles],
+    innFiles: [...files.innFiles],
+    workbook: [...files.workbook],
+    educationFiles: [...files.educationFiles],
+  }), [committed, files, toggles.noEducation]);
+
   // ── Параллакс: заголовок плавно исчезает при скролле ─────────────────────────
   useEffect(() => {
     if (step === 1) {
@@ -922,6 +975,146 @@ export default function Home() {
     window.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
+  }, [step]);
+
+  // ── Жёстко блокируем скролл на шаге 1 (iOS keyboard-safe) ───────────────────
+  const unlockPageScroll = useCallback(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    html.style.overflow = '';
+    html.style.overscrollBehavior = '';
+    html.style.height = '';
+    body.style.overflow = '';
+    body.style.overscrollBehavior = '';
+    body.style.height = '';
+    body.style.position = '';
+    body.style.top = '';
+    body.style.width = '';
+    body.style.left = '';
+    body.style.right = '';
+  }, []);
+
+  useEffect(() => {
+    if (step !== 1) {
+      unlockPageScroll();
+      return;
+    }
+
+    const html = document.documentElement;
+    const body = document.body;
+    const vv = window.visualViewport;
+
+    const prev = {
+      htmlOverflow: html.style.overflow,
+      htmlOverscroll: html.style.overscrollBehavior,
+      htmlHeight: html.style.height,
+      bodyOverflow: body.style.overflow,
+      bodyOverscroll: body.style.overscrollBehavior,
+      bodyHeight: body.style.height,
+      bodyPosition: body.style.position,
+      bodyTop: body.style.top,
+      bodyWidth: body.style.width,
+      bodyLeft: body.style.left,
+      bodyRight: body.style.right,
+    };
+
+    const keepTop = () => {
+      if (window.scrollY !== 0) window.scrollTo(0, 0);
+      if (html.scrollTop !== 0) html.scrollTop = 0;
+      if (body.scrollTop !== 0) body.scrollTop = 0;
+    };
+
+    const lockNonInputScroll = e => {
+      const t = e.target;
+      if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) return;
+      e.preventDefault();
+    };
+
+    const onFocusIn = e => {
+      const t = e.target;
+      if (!(t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement)) return;
+      // iOS может проскроллить layout viewport с задержкой после открытия клавиатуры
+      requestAnimationFrame(keepTop);
+      setTimeout(keepTop, 40);
+      setTimeout(keepTop, 140);
+    };
+
+    html.style.overflow = 'hidden';
+    html.style.overscrollBehavior = 'none';
+    html.style.height = '100%';
+    body.style.overflow = 'hidden';
+    body.style.overscrollBehavior = 'none';
+    body.style.height = '100%';
+    body.style.position = 'fixed';
+    body.style.top = '0';
+    body.style.width = '100%';
+    body.style.left = '0';
+    body.style.right = '0';
+    keepTop();
+
+    window.addEventListener('scroll', keepTop, { passive: true });
+    document.addEventListener('focusin', onFocusIn);
+    document.addEventListener('touchmove', lockNonInputScroll, { passive: false });
+    if (vv) {
+      vv.addEventListener('scroll', keepTop);
+      vv.addEventListener('resize', keepTop);
+    }
+
+    return () => {
+      window.removeEventListener('scroll', keepTop);
+      document.removeEventListener('focusin', onFocusIn);
+      document.removeEventListener('touchmove', lockNonInputScroll);
+      if (vv) {
+        vv.removeEventListener('scroll', keepTop);
+        vv.removeEventListener('resize', keepTop);
+      }
+      html.style.overflow = prev.htmlOverflow;
+      html.style.overscrollBehavior = prev.htmlOverscroll;
+      html.style.height = prev.htmlHeight;
+      body.style.overflow = prev.bodyOverflow;
+      body.style.overscrollBehavior = prev.bodyOverscroll;
+      body.style.height = prev.bodyHeight;
+      body.style.position = prev.bodyPosition;
+      body.style.top = prev.bodyTop;
+      body.style.width = prev.bodyWidth;
+      body.style.left = prev.bodyLeft;
+      body.style.right = prev.bodyRight;
+      unlockPageScroll();
+      window.scrollTo(0, 0);
+    };
+  }, [step, unlockPageScroll]);
+
+  // ── Детект клавиатуры на шаге 1: добавочный сдвиг карточки вверх ─────────────
+  useEffect(() => {
+    if (step !== 1) {
+      setIsKeyboardOpen(false);
+      return;
+    }
+
+    const vv = window.visualViewport;
+    let baseline = vv ? Math.max(vv.height, window.innerHeight) : window.innerHeight;
+    const THRESHOLD = 140;
+
+    const updateKeyboard = () => {
+      const current = vv ? vv.height : window.innerHeight;
+      const delta = baseline - current;
+      const open = delta > THRESHOLD;
+      setIsKeyboardOpen(open);
+      if (!open && current > baseline) baseline = current;
+    };
+
+    updateKeyboard();
+    if (vv) {
+      vv.addEventListener('resize', updateKeyboard);
+      vv.addEventListener('scroll', updateKeyboard);
+    }
+
+    return () => {
+      if (vv) {
+        vv.removeEventListener('resize', updateKeyboard);
+        vv.removeEventListener('scroll', updateKeyboard);
+      }
+    };
   }, [step]);
 
   // ── Сеттеры ─────────────────────────────────────────────────────────────────
@@ -950,8 +1143,8 @@ export default function Home() {
   // ── Готовность полей (по fields — обновляется при каждом вводе, без ожидания blur) ───
   const nameComplete      = fields.name.trim().split(' ').filter(Boolean).length >= 2;
   const passportComplete  = files.passport.length >= 2;
-  const snilsComplete     = fields.snils.replace(/\D/g, '').length === 11 || files.snilsFiles.length > 0;
-  const innComplete       = fields.inn.replace(/\D/g, '').length === 12 || files.innFiles.length > 0;
+  const snilsComplete     = digitsOnly(committed.snils).length === 11 || files.snilsFiles.length > 0;
+  const innComplete       = digitsOnly(committed.inn).length === 12 || files.innFiles.length > 0;
   const workbookComplete  = files.workbook.length > 0;
   const educationComplete = toggles.noEducation || (fields.educationPlace.trim().length > 0 && files.educationFiles.length > 0);
   const paymentComplete   =
@@ -965,19 +1158,19 @@ export default function Home() {
 
   // ── Чипы прогресса (без ФИО) ────────────────────────────────────────────────
   const step2Chips = [
-    { label: 'Паспорт',     anchorId: 'doc-passport',  done: passportComplete  },
-    { label: 'СНИЛС',       anchorId: 'doc-snils',     done: snilsComplete     },
-    { label: 'ИНН',         anchorId: 'doc-inn',       done: innComplete       },
-    { label: 'Трудовая',    anchorId: 'doc-workbook',  done: workbookComplete  },
-    { label: 'Образование', anchorId: 'doc-education', done: educationComplete },
-    { label: 'Реквизиты',   anchorId: 'doc-payment',   done: paymentComplete   },
+    { label: 'Паспорт',     anchorId: 'doc-passport',  done: passportComplete,  error: !!errors.passport },
+    { label: 'СНИЛС',       anchorId: 'doc-snils',     done: snilsComplete,     error: !!errors.snils },
+    { label: 'ИНН',         anchorId: 'doc-inn',       done: innComplete,       error: !!errors.inn },
+    { label: 'Трудовая',    anchorId: 'doc-workbook',  done: workbookComplete,  error: false },
+    { label: 'Образование', anchorId: 'doc-education', done: educationComplete, error: false },
+    { label: 'Реквизиты',   anchorId: 'doc-payment',   done: paymentComplete,   error: !!(errors.contractNumber || errors.accountNumber || errors.bik || errors.corrAccount) },
   ];
 
   const step3Chips = [
-    { label: 'Английский',   anchorId: 'doc-eng',     done: true },
-    { label: 'Семья',        anchorId: 'doc-marital',  done: true },
-    { label: 'Водительское', anchorId: 'doc-driver',   done: files.driverLicense.length === 0 || files.driverLicense.length >= 2 },
-    { label: 'Военник',      anchorId: 'doc-voennik',  done: files.voennik.length === 0 || files.voennik.length >= 2 },
+    { label: 'Английский',   anchorId: 'doc-eng',      done: true, error: false },
+    { label: 'Семья',        anchorId: 'doc-marital',  done: true, error: false },
+    { label: 'Водительское', anchorId: 'doc-driver',   done: files.driverLicense.length === 0 || files.driverLicense.length >= 2, error: !!errors.driverLicense },
+    { label: 'Военник',      anchorId: 'doc-voennik',  done: files.voennik.length === 0 || files.voennik.length >= 2,       error: !!errors.voennik },
   ];
 
   // ── Helpers для direct-upload на Яндекс.Диск ───────────────────────────────
@@ -993,7 +1186,7 @@ export default function Home() {
   // — Сервер (/api/sign-uploads) только выдаёт href'ы от Яндекса.
   // — Клиент PUT'ит байты напрямую в uploader*.disk.yandex.net.
   // Плюс: серверный fetch к uploader-доменам (который флэйкает из Node) исключён.
-  async function uploadDirect(items) {
+  async function uploadDirect(items, { onProgress } = {}) {
     if (!items.length) return;
     const normalized = items.map(({ path, file, content }) => ({
       path,
@@ -1001,52 +1194,122 @@ export default function Home() {
         ? new Blob([content], { type: 'text/plain; charset=utf-8' })
         : file,
     }));
-    const r = await fetch('/api/sign-uploads', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paths: normalized.map(i => i.path) }),
-    });
-    if (!r.ok) {
-      const err = await r.json().catch(() => ({}));
-      throw new Error(err.error ?? 'sign-uploads failed');
-    }
-    const { links } = await r.json(); // [{ path, href }]
-    const hrefByPath = new Map(links.map(l => [l.path, l.href]));
-    // PUT с retry на транзиентные сбои (Яндекс любит иногда уронить соединение).
-    const putWithRetry = async (path, body, attempt = 1) => {
+    const total = normalized.length;
+    let done = 0;
+    onProgress?.({ done, total });
+
+    const putWithRetry = async (href, path, body, attempt = 1) => {
       try {
-        const put = await fetch(hrefByPath.get(path), { method: 'PUT', body });
+        const put = await fetch(href, { method: 'PUT', body });
         if (!put.ok) {
           const t = await put.text().catch(() => '');
           throw new Error(`PUT ${path} (${put.status}): ${t.slice(0, 160)}`);
         }
       } catch (e) {
-        if (attempt < 3) {
-          await new Promise(res => setTimeout(res, 300 * attempt));
-          return putWithRetry(path, body, attempt + 1);
+        if (attempt < 4) {
+          await new Promise(res => setTimeout(res, 400 * attempt));
+          return putWithRetry(href, path, body, attempt + 1);
         }
         throw e;
       }
     };
-    await Promise.all(normalized.map(({ path, body }) => {
-      if (!hrefByPath.get(path)) throw new Error(`no href for ${path}`);
-      return putWithRetry(path, body);
-    }));
+
+    for (let i = 0; i < normalized.length; i += UPLOAD_BATCH_SIZE) {
+      const batch = normalized.slice(i, i + UPLOAD_BATCH_SIZE);
+      const r = await fetch('/api/sign-uploads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paths: batch.map(item => item.path) }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.error ?? 'sign-uploads failed');
+      }
+      const { links } = await r.json();
+      const hrefByPath = new Map(links.map(l => [l.path, l.href]));
+
+      await Promise.all(batch.map(({ path, body }) => {
+        const href = hrefByPath.get(path);
+        if (!href) throw new Error(`no href for ${path}`);
+        return putWithRetry(href, path, body);
+      }));
+
+      done += batch.length;
+      onProgress?.({ done, total });
+    }
   }
 
-  // ── Фон: создание папок (один раз) ──────────────────────────────────────────
+  // ── Фон: создание папок (привязано к ФИО; при смене имени — новый запрос) ───
   const ensureFolders = useCallback(fullName => {
-    if (foldersPromiseRef.current) return foldersPromiseRef.current;
+    const name = normalizeName(fullName);
+    if (foldersPromiseRef.current && foldersNameRef.current === name) {
+      return foldersPromiseRef.current;
+    }
+    foldersNameRef.current = name;
+    foldersPromiseRef.current = null;
+    step2UploadPromiseRef.current = null;
+    step2UploadGenRef.current += 1;
+
     foldersPromiseRef.current = fetch('/api/create-folders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fullName }),
+      body: JSON.stringify({ fullName: name }),
     }).then(r => {
       if (!r.ok) return r.json().then(e => Promise.reject(new Error(e.error ?? 'create-folders failed')));
       return r.json(); // → { basePath }
     });
     return foldersPromiseRef.current;
   }, []);
+
+  const buildStep2UploadItems = useCallback((snap, basePath) => {
+    const items = [];
+    const pushFiles = (folder, list) =>
+      list.forEach((file, i) => items.push({
+        path: `${basePath}/${folder}/${i + 1}.${getExt(file.name)}`,
+        file,
+      }));
+
+    pushFiles('1. Паспорт',         snap.passport);
+    pushFiles('2. СНИЛС',           snap.snilsFiles);
+    pushFiles('3. ИНН',             snap.innFiles);
+    pushFiles('4. Трудовая книжка', snap.workbook);
+    if (!snap.noEducation) pushFiles('5. Образование', snap.educationFiles);
+
+    const snilsNum = digitsOnly(snap.snils);
+    if (snilsNum) items.push({ path: `${basePath}/2. СНИЛС/Номер СНИЛС.txt`, content: snilsNum });
+    const innNum = digitsOnly(snap.inn);
+    if (innNum) items.push({ path: `${basePath}/3. ИНН/Номер ИНН.txt`, content: innNum });
+    if (!snap.noEducation && snap.educationPlace.trim()) {
+      items.push({ path: `${basePath}/5. Образование/Учебное заведение.txt`, content: snap.educationPlace.trim() });
+    }
+    const paymentText = [
+      `Номер договора:         ${digitsOnly(snap.contractNumber)}`,
+      `Номер счёта:            ${digitsOnly(snap.accountNumber)}`,
+      `БИК:                    ${digitsOnly(snap.bik)}`,
+      `Корреспондентский счёт: ${digitsOnly(snap.corrAccount)}`,
+    ].join('\n');
+    items.push({ path: `${basePath}/Реквизиты.txt`, content: paymentText });
+    return items;
+  }, []);
+
+  const startStep2Upload = useCallback(snap => {
+    const uploadGen = step2UploadGenRef.current;
+
+    const promise = (async () => {
+      const { basePath } = await foldersPromiseRef.current;
+      if (uploadGen !== step2UploadGenRef.current) return;
+      await uploadDirect(buildStep2UploadItems(snap, basePath));
+    })();
+
+    promise.catch(err => {
+      if (uploadGen !== step2UploadGenRef.current) return;
+      console.error('[step2-upload]', err);
+      step2UploadPromiseRef.current = null;
+    });
+
+    step2UploadPromiseRef.current = promise;
+    return promise;
+  }, [buildStep2UploadItems]);
 
   // ── Обработчики переходов ────────────────────────────────────────────────────
 
@@ -1062,78 +1325,28 @@ export default function Home() {
   const handleStep2Continue = useCallback(() => {
     if (!step2Complete) return;
 
-    // Запускаем только один раз
-    if (!step2UploadPromiseRef.current) {
-      // Сохраняем снапшот состояния прямо сейчас (до перехода на экран 3)
-      const snap = {
-        snils:       committed.snils,
-        inn:         committed.inn,
-        educationPlace: committed.educationPlace,
-        contractNumber: committed.contractNumber,
-        accountNumber: committed.accountNumber,
-        bik:         committed.bik,
-        corrAccount: committed.corrAccount,
-        noEducation: toggles.noEducation,
-        passport:    [...files.passport],
-        snilsFiles:  [...files.snilsFiles],
-        innFiles:    [...files.innFiles],
-        workbook:    [...files.workbook],
-        educationFiles: [...files.educationFiles],
-      };
-
-      step2UploadPromiseRef.current = (async () => {
-        // Ждём basePath (папки должны быть созданы ~5 сек)
-        const { basePath } = await foldersPromiseRef.current;
-
-        // ── Собираем ВСЁ (файлы + текст) в один массив ───────────────────────
-        const items = [];
-        const pushFiles = (folder, list) =>
-          list.forEach((file, i) => items.push({
-            path: `${basePath}/${folder}/${i + 1}.${getExt(file.name)}`,
-            file,
-          }));
-
-        pushFiles('1. Паспорт',         snap.passport);
-        pushFiles('2. СНИЛС',           snap.snilsFiles);
-        pushFiles('3. ИНН',             snap.innFiles);
-        pushFiles('4. Трудовая книжка', snap.workbook);
-        if (!snap.noEducation) pushFiles('5. Образование', snap.educationFiles);
-
-        const snilsNum = digitsOnly(snap.snils);
-        if (snilsNum) items.push({ path: `${basePath}/2. СНИЛС/Номер СНИЛС.txt`, content: snilsNum });
-        const innNum = digitsOnly(snap.inn);
-        if (innNum) items.push({ path: `${basePath}/3. ИНН/Номер ИНН.txt`, content: innNum });
-        if (!snap.noEducation && snap.educationPlace.trim()) {
-          items.push({ path: `${basePath}/5. Образование/Учебное заведение.txt`, content: snap.educationPlace.trim() });
-        }
-        const paymentText = [
-          `Номер договора:         ${digitsOnly(snap.contractNumber)}`,
-          `Номер счёта:            ${digitsOnly(snap.accountNumber)}`,
-          `БИК:                    ${digitsOnly(snap.bik)}`,
-          `Корреспондентский счёт: ${digitsOnly(snap.corrAccount)}`,
-        ].join('\n');
-        items.push({ path: `${basePath}/Реквизиты.txt`, content: paymentText });
-
-        // Одним direct-upload'ом — всё параллельно, ничего не идёт через наш сервер
-        await uploadDirect(items);
-      })();
-    }
+    const name = normalizeName(fields.name);
+    ensureFolders(name);
+    step2UploadGenRef.current += 1;
+    startStep2Upload(getStep2Snap());
 
     setStep(3);
     window.scrollTo({ top: 0, behavior: 'instant' });
-  }, [step2Complete, committed, files, toggles]);
+  }, [step2Complete, fields.name, getStep2Snap, ensureFolders, startStep2Upload]);
 
-  // 3 → Готово: ждём фоновые загрузки, затем отправляем данные экрана 3
+  // 3 → Готово: ждём фоновые загрузки (если ещё идут), затем отправляем шаг 3
   const handleFinish = useCallback(async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     setServerError(null);
+    setSubmitPhase('docs');
 
     try {
-      // Ждём завершения фоновых операций (если ещё идут)
       await foldersPromiseRef.current;
-      if (step2UploadPromiseRef.current) await step2UploadPromiseRef.current;
+      const step2Promise = step2UploadPromiseRef.current ?? startStep2Upload(getStep2Snap());
+      await step2Promise;
 
+      setSubmitPhase('send');
       const { basePath } = await foldersPromiseRef.current;
 
       // ── Шаг 3: файлы + текст одним пайплайном direct-upload ───────────────
@@ -1163,8 +1376,9 @@ export default function Home() {
       setServerError(err.message || 'Не удалось отправить данные. Попробуйте ещё раз.');
     } finally {
       setIsSubmitting(false);
+      setSubmitPhase(null);
     }
-  }, [isSubmitting, toggles, files]);
+  }, [isSubmitting, getStep2Snap, startStep2Upload, toggles, files]);
 
   const handleBack = useCallback(() => {
     setStep(s => Math.max(1, s - 1));
@@ -1227,6 +1441,12 @@ export default function Home() {
         minHeight: step === 1 ? '100dvh' : '100vh',
         height:    step === 1 ? '100dvh' : 'auto',
         overflow:  step === 1 ? 'hidden'  : 'visible',
+        position:  step === 1 ? 'fixed'   : 'relative',
+        top:       step === 1 ? 0         : 'auto',
+        left:      step === 1 ? 0         : 'auto',
+        right:     step === 1 ? 0         : 'auto',
+        bottom:    step === 1 ? 0         : 'auto',
+        width:     '100%',
       }}>
 
         {/* ── Task (header) ── */}
@@ -1250,7 +1470,13 @@ export default function Home() {
             boxSizing: 'border-box',
             minHeight: 0, // разрешаем flex-потомку ужиматься под маленький экран
           }}>
-           <div style={{ width: '100%', maxWidth: 402 }}>
+           <div style={{
+             width: '100%',
+             maxWidth: 402,
+             transform: `translateY(-${72 + (isKeyboardOpen ? 64 : 0)}px)`,
+             transition: 'transform var(--ui-bounce-medium) var(--ui-bounce-ease)',
+             willChange: 'transform',
+           }}>
             {/* Карточка ФИО */}
             <DocCard id="doc-name" title="Назовите ФИО">
               <TextField
@@ -1283,7 +1509,7 @@ export default function Home() {
                 fontWeight: 500,
                 lineHeight: '16px',
                 cursor: nameComplete ? 'pointer' : 'default',
-                transition: 'all 0.2s',
+                transition: 'transform var(--ui-bounce-fast) var(--ui-bounce-ease), background 180ms var(--ui-bounce-ease-soft), color 180ms var(--ui-bounce-ease-soft)',
               }}
             >
               Начать
@@ -1306,12 +1532,12 @@ export default function Home() {
               </DocCard>
 
               <DocCard id="doc-snils" title="СНИЛС">
-                <TextField placeholder="12345678901" value={fields.snils} onChange={v => setField('snils')(toDigitsOnly(v))} onCommit={commitField('snils')} error={errors.snils} digitOnly />
+                <TextField placeholder="12345678901" value={fields.snils} onChange={v => setField('snils')(digitsOnly(v))} onCommit={commitField('snils')} error={errors.snils} digitOnly />
                 <FileUpload value={files.snilsFiles} onChange={setFile('snilsFiles')} compact buttonLabel="Загрузить фото или скан" maxFiles={1} />
               </DocCard>
 
               <DocCard id="doc-inn" title="ИНН">
-                <TextField placeholder="123456789012" value={fields.inn} onChange={v => setField('inn')(toDigitsOnly(v))} onCommit={commitField('inn')} error={errors.inn} digitOnly />
+                <TextField placeholder="123456789012" value={fields.inn} onChange={v => setField('inn')(digitsOnly(v))} onCommit={commitField('inn')} error={errors.inn} digitOnly />
                 <FileUpload value={files.innFiles} onChange={setFile('innFiles')} compact buttonLabel="Загрузить фото или скан" maxFiles={1} />
               </DocCard>
 
@@ -1328,10 +1554,10 @@ export default function Home() {
               </DocCard>
 
               <DocCard id="doc-payment" title="Реквизиты">
-                <TextField label="Номер договора"    placeholder="1234567890"           value={fields.contractNumber} onChange={v => setField('contractNumber')(toDigitsOnly(v))} onCommit={commitField('contractNumber')} error={errors.contractNumber} digitOnly />
-                <TextField label="Номер счета"        placeholder="12345678901234567890" value={fields.accountNumber}  onChange={v => setField('accountNumber')(toDigitsOnly(v))}  onCommit={commitField('accountNumber')}  error={errors.accountNumber}  digitOnly />
-                <TextField label="БИК"                placeholder="123456789"           value={fields.bik}            onChange={v => setField('bik')(toDigitsOnly(v))}            onCommit={commitField('bik')}            error={errors.bik}            digitOnly />
-                <TextField label="Корр. счет"         placeholder="12345678901234567890" value={fields.corrAccount}    onChange={v => setField('corrAccount')(toDigitsOnly(v))}    onCommit={commitField('corrAccount')}    error={errors.corrAccount}    digitOnly />
+                <TextField label="Номер договора"    placeholder="1234567890"           value={fields.contractNumber} onChange={v => setField('contractNumber')(digitsOnly(v))} onCommit={commitField('contractNumber')} error={errors.contractNumber} digitOnly />
+                <TextField label="Номер счета"        placeholder="12345678901234567890" value={fields.accountNumber}  onChange={v => setField('accountNumber')(digitsOnly(v))}  onCommit={commitField('accountNumber')}  error={errors.accountNumber}  digitOnly />
+                <TextField label="БИК"                placeholder="123456789"           value={fields.bik}            onChange={v => setField('bik')(digitsOnly(v))}            onCommit={commitField('bik')}            error={errors.bik}            digitOnly />
+                <TextField label="Корр. счет"         placeholder="12345678901234567890" value={fields.corrAccount}    onChange={v => setField('corrAccount')(digitsOnly(v))}    onCommit={commitField('corrAccount')}    error={errors.corrAccount}    digitOnly />
               </DocCard>
             </DocList>
 
@@ -1370,8 +1596,13 @@ export default function Home() {
             <BottomMenu
               ref={menuRef}
               chips={step3Chips}
-              buttonLabel={isSubmitting ? 'Отправка…' : 'Готово'}
+              buttonLabel={
+                isSubmitting
+                  ? (submitPhase === 'send' ? 'Отправка…' : 'Загружаем документы…')
+                  : 'Готово'
+              }
               onButton={handleFinish}
+              buttonLoading={isSubmitting}
               buttonDisabled={isSubmitting}
               errorText={serverError}
             />

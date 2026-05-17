@@ -9,7 +9,7 @@
 const YANDEX_API = 'https://cloud-api.yandex.net/v1/disk';
 const TOKEN      = process.env.YANDEX_DISK_TOKEN;
 
-// Лимит — защита от абьюза. 60 файлов = паспорт(20) + остальное.
+// Лимит — защита от абьюза (паспорт до 20 + остальные документы).
 const MAX_PATHS = 80;
 
 async function signOne(path) {
