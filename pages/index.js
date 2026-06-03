@@ -602,7 +602,7 @@ function Checkbox({ label, checked, onChange }) {
           <CheckboxIcon checked={checked} />
         </div>
       </div>
-      <div style={{ color: 'var(--text-primary)', fontFamily: 'Onest', fontSize: 16, fontWeight: 500, lineHeight: '16px' }}>
+      <div style={{ color: 'var(--text-primary)', fontFamily: 'Onest', fontSize: 16, fontWeight: 500, lineHeight: '24px', textAlign: 'left' }}>
         {label}
       </div>
     </button>
