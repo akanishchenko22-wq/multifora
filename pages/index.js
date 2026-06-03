@@ -1489,30 +1489,16 @@ export default function Home() {
             </DocCard>
 
             {/* Соглашение на обработку персональных данных */}
-            <div style={{ marginTop: 16, display: 'flex', alignItems: 'flex-start', gap: 8, padding: '0 16px' }}>
-              <button
-                onClick={() => setToggle('pdAgree')(!toggles.pdAgree)}
-                style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0, height: 24 }}
-              >
-                <div style={{ width: 24, height: 24, minWidth: 24, minHeight: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <div className={toggles.pdAgree ? undefined : 'gb'} style={{ width: 20, height: 20, borderRadius: 4, flexShrink: 0, display: 'flex' }}>
-                    <CheckboxIcon checked={toggles.pdAgree} />
-                  </div>
+            <button onClick={() => setToggle('pdAgree')(!toggles.pdAgree)} style={{ marginTop: 16, display: 'flex', alignSelf: 'stretch', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: 0, height: 24 }}>
+              <div style={{ width: 24, height: 24, minWidth: 24, minHeight: 24, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div className={toggles.pdAgree ? undefined : 'gb'} style={{ width: 20, height: 20, borderRadius: 4, flexShrink: 0, display: 'flex' }}>
+                  <CheckboxIcon checked={toggles.pdAgree} />
                 </div>
-              </button>
-              <div style={{ color: 'var(--text-primary)', fontFamily: 'Onest', fontSize: 14, fontWeight: 400, lineHeight: '20px' }}>
-                Я согласен с{' '}
-                <a
-                  href="https://multifora.ru/privacy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: '#446BF2', textDecoration: 'none' }}
-                  onClick={e => e.stopPropagation()}
-                >
-                  политикой обработки персональных данных
-                </a>
               </div>
-            </div>
+              <div style={{ color: 'var(--text-primary)', fontFamily: 'Onest', fontSize: 16, fontWeight: 500, lineHeight: '16px' }}>
+                Согласен с обработкой персональных данных
+              </div>
+            </button>
 
             {/* Кнопка «Начать» — ровно 8px от чекбокса */}
             <button
