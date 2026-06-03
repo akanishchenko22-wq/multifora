@@ -1489,13 +1489,13 @@ export default function Home() {
             </DocCard>
 
             {/* Соглашение на обработку персональных данных */}
-            <button onClick={() => setToggle('pdAgree')(!toggles.pdAgree)} style={{ marginTop: 16, display: 'flex', alignSelf: 'stretch', alignItems: 'center', justifyContent: 'flex-start', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: 0, height: 24 }}>
+            <button onClick={() => setToggle('pdAgree')(!toggles.pdAgree)} style={{ marginTop: 16, display: 'flex', alignSelf: 'stretch', alignItems: 'flex-start', justifyContent: 'flex-start', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
               <div style={{ width: 24, height: 24, minWidth: 24, minHeight: 24, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div className={toggles.pdAgree ? undefined : 'gb'} style={{ width: 20, height: 20, borderRadius: 4, flexShrink: 0, display: 'flex' }}>
                   <CheckboxIcon checked={toggles.pdAgree} />
                 </div>
               </div>
-              <div style={{ color: 'var(--text-primary)', fontFamily: 'Onest', fontSize: 16, fontWeight: 500, lineHeight: '16px' }}>
+              <div style={{ color: 'var(--text-primary)', fontFamily: 'Onest', fontSize: 16, fontWeight: 500, lineHeight: '24px', textAlign: 'left' }}>
                 Согласен с обработкой персональных данных
               </div>
             </button>
