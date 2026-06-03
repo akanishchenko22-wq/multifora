@@ -1516,7 +1516,7 @@ export default function Home() {
             </button>
 
             {/* Согласие на обработку ПД */}
-            <div style={{ marginTop: 16, alignSelf: 'stretch', color: 'var(--text-secondary, rgba(51, 54, 63, 0.65))', textAlign: 'center', fontFamily: 'Onest', fontSize: 14, fontStyle: 'normal', fontWeight: 400, lineHeight: '140%' }}>
+            <div style={{ marginTop: 8, alignSelf: 'stretch', color: 'var(--text-secondary, rgba(51, 54, 63, 0.65))', textAlign: 'center', fontFamily: 'Onest', fontSize: 14, fontStyle: 'normal', fontWeight: 400, lineHeight: '140%' }}>
               Нажимая на «Начать» вы даете согласие на обработку персональных данных
             </div>
            </div>
