@@ -602,7 +602,7 @@ function Checkbox({ label, checked, onChange }) {
           <CheckboxIcon checked={checked} />
         </div>
       </div>
-      <div style={{ color: 'var(--text-primary)', fontFamily: 'Onest', fontSize: 16, fontWeight: 500, lineHeight: '24px', textAlign: 'left' }}>
+      <div style={{ color: 'var(--text-primary)', fontFamily: 'Onest', fontSize: 16, fontWeight: 500, lineHeight: '16px' }}>
         {label}
       </div>
     </button>
@@ -912,7 +912,7 @@ export default function Home() {
   const [fields, setFields]     = useState({ name: '', snils: '', inn: '', educationPlace: '', contractNumber: '', accountNumber: '', bik: '', corrAccount: '' });
   const [committed, setCommitted] = useState({ name: '', snils: '', inn: '', educationPlace: '', contractNumber: '', accountNumber: '', bik: '', corrAccount: '' });
   const [files, setFiles]       = useState({ passport: [], snilsFiles: [], innFiles: [], workbook: [], educationFiles: [], driverLicense: [], voennik: [] });
-  const [toggles, setToggles]   = useState({ engLevel: 'A1', marital: 'Не в браке', noEducation: false, hasChildren: false, pdAgree: false });
+  const [toggles, setToggles]   = useState({ engLevel: 'A1', marital: 'Не в браке', noEducation: false, hasChildren: false });
 
   // ── Статус отправки ─────────────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1488,22 +1488,10 @@ export default function Home() {
               />
             </DocCard>
 
-            {/* Соглашение на обработку персональных данных */}
-            <button onClick={() => setToggle('pdAgree')(!toggles.pdAgree)} style={{ marginTop: 16, display: 'flex', alignSelf: 'stretch', alignItems: 'flex-start', justifyContent: 'flex-start', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-              <div style={{ width: 24, height: 24, minWidth: 24, minHeight: 24, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div className={toggles.pdAgree ? undefined : 'gb'} style={{ width: 20, height: 20, borderRadius: 4, flexShrink: 0, display: 'flex' }}>
-                  <CheckboxIcon checked={toggles.pdAgree} />
-                </div>
-              </div>
-              <div style={{ color: 'var(--text-primary)', fontFamily: 'Onest', fontSize: 16, fontWeight: 500, lineHeight: '24px', textAlign: 'left' }}>
-                Согласен с обработкой персональных данных
-              </div>
-            </button>
-
-            {/* Кнопка «Начать» — ровно 8px от чекбокса */}
+            {/* Кнопка «Начать» */}
             <button
               onClick={handleStep1Continue}
-              disabled={!nameComplete || !toggles.pdAgree}
+              disabled={!nameComplete}
               style={{
                 marginTop: 8,
                 display: 'flex',
@@ -1514,18 +1502,23 @@ export default function Home() {
                 alignItems: 'center',
                 borderRadius: 16,
                 border: 'none',
-                background: (nameComplete && toggles.pdAgree) ? '#446BF2' : 'var(--ctrl-disabled)',
-                color: (nameComplete && toggles.pdAgree) ? '#FFFFFF' : 'var(--text-disabled)',
+                background: nameComplete ? '#446BF2' : 'var(--ctrl-disabled)',
+                color: nameComplete ? '#FFFFFF' : 'var(--text-disabled)',
                 fontFamily: 'Onest',
                 fontSize: 16,
                 fontWeight: 500,
                 lineHeight: '16px',
-                cursor: (nameComplete && toggles.pdAgree) ? 'pointer' : 'default',
+                cursor: nameComplete ? 'pointer' : 'default',
                 transition: 'transform var(--ui-bounce-fast) var(--ui-bounce-ease), background 180ms var(--ui-bounce-ease-soft), color 180ms var(--ui-bounce-ease-soft)',
               }}
             >
               Начать
             </button>
+
+            {/* Согласие на обработку ПД */}
+            <div style={{ marginTop: 16, alignSelf: 'stretch', color: 'var(--text-secondary, rgba(51, 54, 63, 0.65))', textAlign: 'center', fontFamily: 'Onest', fontSize: 14, fontStyle: 'normal', fontWeight: 400, lineHeight: '140%' }}>
+              Нажимая на «Начать» вы даете согласие на обработку персональных данных
+            </div>
            </div>
           </div>
         )}
