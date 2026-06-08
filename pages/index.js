@@ -712,7 +712,7 @@ function Task({ step, onBack, titleRef }) {
         margin: '0 auto',
         paddingTop: 'calc(20px + env(safe-area-inset-top, 0px))',
         paddingRight: 8,
-        paddingBottom: isScrollable ? 28 : 8,
+        paddingBottom: 8,
         paddingLeft: 8,
         boxSizing: 'border-box',
         background: isScrollable ? undefined : 'transparent',
@@ -757,8 +757,8 @@ function Task({ step, onBack, titleRef }) {
       */}
       <div ref={titleRef} style={{
         position: isScrollable ? 'sticky' : 'relative',
-        // nav: 20 (safe-area-top) + 32 (иконки) + 28 (padding-bottom с градиентом) = 80
-        top: isScrollable ? 'calc(80px + env(safe-area-inset-top, 0px))' : 'auto',
+        // nav: 20 (safe-area-top) + 32 (иконки) + 8 (padding-bottom) = 60
+        top: isScrollable ? 'calc(60px + env(safe-area-inset-top, 0px))' : 'auto',
         zIndex: 10,
         width: '100%',
         maxWidth: 402,
@@ -1516,7 +1516,7 @@ export default function Home() {
             </button>
 
             {/* Согласие на обработку ПД */}
-            <div style={{ marginTop: 8, alignSelf: 'stretch', color: 'var(--text-secondary, rgba(51, 54, 63, 0.65))', textAlign: 'center', fontFamily: 'Onest', fontSize: 14, fontStyle: 'normal', fontWeight: 400, lineHeight: '140%' }}>
+            <div style={{ marginTop: 16, alignSelf: 'stretch', color: 'var(--text-secondary, rgba(51, 54, 63, 0.65))', textAlign: 'center', fontFamily: 'Onest', fontSize: 14, fontStyle: 'normal', fontWeight: 400, lineHeight: '140%' }}>
               Нажимая на «Начать» вы даете согласие на обработку персональных данных
             </div>
            </div>
@@ -1600,7 +1600,7 @@ export default function Home() {
 
             <BottomMenu
               ref={menuRef}
-              chips={step3Chips}
+              chips={step2Chips}
               buttonLabel={
                 isSubmitting
                   ? (submitPhase === 'send' ? 'Отправка…' : 'Загружаем документы…')
